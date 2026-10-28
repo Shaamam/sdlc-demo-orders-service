@@ -33,14 +33,17 @@ if ($Key) {
     gh pr close $pr.number --delete-branch --comment "Demo reset" | Out-Null
     Write-Host "  closed PR #$($pr.number) ($($pr.headRefName))"
   }
+  git fetch --prune origin 2>$null | Out-Null
   $current = (git rev-parse --abbrev-ref HEAD).Trim()
   if ($current -like "*$Key*") { git switch main | Out-Null }
   foreach ($b in (git branch --format '%(refname:short)') | Where-Object { $_ -like "*$Key*" }) {
     git branch -D $b | Out-Null; Write-Host "  deleted local branch $b"
   }
-  foreach ($b in (git branch -r --format '%(refname:short)') | Where-Object { $_ -like "origin/*$Key*" }) {
-    git push origin --delete ($b -replace '^origin/', '') | Out-Null; Write-Host "  deleted remote branch $b"
+  $remote = git ls-remote --heads origin | ForEach-Object { ($_ -split "\s+")[1] -replace '^refs/heads/', '' }
+  foreach ($b in $remote | Where-Object { $_ -like "*$Key*" }) {
+    git push origin --delete $b 2>$null | Out-Null; Write-Host "  deleted remote branch $b"
   }
+  git fetch --prune origin 2>$null | Out-Null
   $state = Join-Path (Join-Path (Join-Path $agentHome $owner) $name) $Key
   if (Test-Path $state) { Remove-Item -Recurse -Force $state; Write-Host "  removed agent state $state" }
   $active = Join-Path $agentHome 'active.json'

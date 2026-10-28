@@ -13,10 +13,12 @@ reset_key() {
   git fetch --prune origin >/dev/null
   gh pr list --state open --json number,headRefName -q ".[] | select(.headRefName | contains(\"$key\")) | .number" |
     while read -r n; do gh pr close "$n" --delete-branch --comment "Demo reset" >/dev/null; echo "  closed PR #$n"; done
+  git fetch --prune origin >/dev/null 2>&1
   case "$(git rev-parse --abbrev-ref HEAD)" in *"$key"*) git switch main >/dev/null ;; esac
   git branch --format '%(refname:short)' | grep -F "$key" | while read -r b; do git branch -D "$b" >/dev/null; echo "  deleted local branch $b"; done || true
-  git branch -r --format '%(refname:short)' | grep -F "origin/" | grep -F "$key" | sed 's#^origin/##' |
-    while read -r b; do git push origin --delete "$b" >/dev/null; echo "  deleted remote branch $b"; done || true
+  git ls-remote --heads origin | awk '{print $2}' | sed 's#^refs/heads/##' | grep -F "$key" |
+    while read -r b; do git push origin --delete "$b" >/dev/null 2>&1; echo "  deleted remote branch $b"; done || true
+  git fetch --prune origin >/dev/null 2>&1
   local state="$agent_home/$repo/$key"
   [ -d "$state" ] && rm -rf "$state" && echo "  removed agent state $state"
   if [ -f "$agent_home/active.json" ]; then
